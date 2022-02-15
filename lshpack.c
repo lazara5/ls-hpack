@@ -180,8 +180,8 @@ static const uint32_t static_table_nameval_hash[HPACK_STATIC_TABLE_SIZE] =
     memset((a), 0, sizeof(*(a)));                                       \
 } while (0)
 
-#define lshpack_arr_cleanup(a) do {                                     \
-    free((a)->els);                                                     \
+#define lshpack_arr_cleanup(dec, a) do {                                \
+    dec->free((a)->els, dec->mem_user_data);                            \
     memset((a), 0, sizeof(*(a)));                                       \
 } while (0)
 
@@ -205,7 +205,7 @@ static const uint32_t static_table_nameval_hash[HPACK_STATIC_TABLE_SIZE] =
 #define lshpack_arr_count(a) (+(a)->nelem)
 
 static int
-lshpack_arr_push (struct lshpack_arr *arr, uintptr_t val)
+lshpack_arr_push (struct lshpack_dec *dec, struct lshpack_arr *arr, uintptr_t val)
 {
     uintptr_t *new_els;
     unsigned n;
@@ -231,11 +231,11 @@ lshpack_arr_push (struct lshpack_arr *arr, uintptr_t val)
         n = arr->nalloc * 2;
     else
         n = 64;
-    new_els = malloc(n * sizeof(arr->els[0]));
+    new_els = dec->malloc(n * sizeof(arr->els[0]), dec->mem_user_data);
     if (!new_els)
         return -1;
     memcpy(new_els, arr->els + arr->off, sizeof(arr->els[0]) * arr->nelem);
-    free(arr->els);
+    dec->free(arr->els, dec->mem_user_data);
     arr->off = 0;
     arr->els = new_els;
     arr->nalloc = n;
@@ -1266,6 +1266,13 @@ struct decode_status
     uint8_t eos;
 };
 
+static void *default_malloc(size_t size, void *mem_user_data) {
+	return malloc(size);
+}
+
+static void default_free(void *ptr, void *mem_user_data) {
+	free(ptr);
+}
 
 void
 lshpack_dec_init (struct lshpack_dec *dec)
@@ -1274,8 +1281,20 @@ lshpack_dec_init (struct lshpack_dec *dec)
     dec->hpd_max_capacity = INITIAL_DYNAMIC_TABLE_SIZE;
     dec->hpd_cur_max_capacity = INITIAL_DYNAMIC_TABLE_SIZE;
     lshpack_arr_init(&dec->hpd_dyn_table);
+    dec->malloc = default_malloc;
+    dec->free = default_free;
+    dec->mem_user_data = NULL;
 }
 
+void
+lshpack_dec_init_alloc (struct lshpack_dec *dec,
+        lshpack_malloc user_malloc, lshpack_free user_free, void *mem_user_data)
+{
+	lshpack_dec_init(dec);
+	dec->malloc = user_malloc;
+	dec->free = user_free;
+	dec->mem_user_data = mem_user_data;
+}
 
 void
 lshpack_dec_cleanup (struct lshpack_dec *dec)
@@ -1285,9 +1304,9 @@ lshpack_dec_cleanup (struct lshpack_dec *dec)
     while (lshpack_arr_count(&dec->hpd_dyn_table) > 0)
     {
         val = lshpack_arr_pop(&dec->hpd_dyn_table);
-        free((struct dec_table_entry *) val);
+        dec->free((struct dec_table_entry *) val, dec->mem_user_data);
     }
-    lshpack_arr_cleanup(&dec->hpd_dyn_table);
+    lshpack_arr_cleanup(dec, &dec->hpd_dyn_table);
 }
 
 
@@ -1356,7 +1375,7 @@ hdec_drop_oldest_entry (struct lshpack_dec *dec)
     dec->hpd_cur_capacity -= DYNAMIC_ENTRY_OVERHEAD + entry->dte_name_len
                                                         + entry->dte_val_len;
     ++dec->hpd_state;
-    free(entry);
+    dec->free(entry, dec->mem_user_data);
 }
 
 
@@ -1528,13 +1547,13 @@ lshpack_dec_push_entry (struct lshpack_dec *dec,
     val_len = xhdr->val_len;
 
     size = sizeof(*entry) + name_len + val_len;
-    entry = malloc(size);
+    entry = dec->malloc(size, dec->mem_user_data);
     if (!entry)
         return -1;
 
-    if (0 != lshpack_arr_push(&dec->hpd_dyn_table, (uintptr_t) entry))
+    if (0 != lshpack_arr_push(dec, &dec->hpd_dyn_table, (uintptr_t) entry))
     {
-        free(entry);
+        dec->free(entry, dec->mem_user_data);
         return -1;
     }
     ++dec->hpd_state;

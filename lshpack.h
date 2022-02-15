@@ -176,6 +176,13 @@ lshpack_enc_hist_used (const struct lshpack_enc *);
 void
 lshpack_dec_init (struct lshpack_dec *);
 
+typedef void *(*lshpack_malloc)(size_t size, void *mem_user_data);
+typedef void (*lshpack_free)(void *ptr, void *mem_user_data);
+
+void
+lshpack_dec_init_alloc (struct lshpack_dec *dec,
+    lshpack_malloc user_malloc, lshpack_free user_free, void *mem_user_data);
+
 /**
  * Clean up HPACK decoder structure, freeing all allocated memory.
  */
@@ -284,6 +291,9 @@ struct lshpack_dec
     unsigned           hpd_cur_capacity;
     unsigned           hpd_state;
     unsigned           hpd_ignore_dyntable;
+    lshpack_malloc     malloc;
+    lshpack_free       free;
+    void              *mem_user_data;
 };
 
 /* This function may update hash values and flags */
