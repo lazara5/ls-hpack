@@ -119,7 +119,8 @@ enum lshpack_static_hdr_idx
 
 #define LSHPACK_MAX_INDEX           61
 
-#define LSHPACK_ERR_MORE_BUF        (-3)
+#define LSHPACK_ERR_MORE_BUF        (-4)
+#define LSHPACK_ERR_DYN_MISSING     (-3)
 #define LSHPACK_ERR_TOO_LARGE       (-2)
 #define LSHPACK_ERR_BAD_DATA        (-1)
 #define LSHPACK_OK                  (0)
@@ -282,6 +283,7 @@ struct lshpack_dec
     unsigned           hpd_cur_max_capacity;   /* Adjusted at runtime */
     unsigned           hpd_cur_capacity;
     unsigned           hpd_state;
+    unsigned           hpd_ignore_dyntable;
 };
 
 /* This function may update hash values and flags */

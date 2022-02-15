@@ -1504,7 +1504,7 @@ hdec_get_table_entry (struct lshpack_dec *dec, uint32_t index)
     uintptr_t val;
 
     index -= HPACK_STATIC_TABLE_SIZE;
-    if (index == 0 || index > lshpack_arr_count(&dec->hpd_dyn_table))
+    if (index == 0 || index > lshpack_arr_count(&dec->hpd_dyn_table) || dec->hpd_ignore_dyntable)
         return NULL;
 
     index = lshpack_arr_count(&dec->hpd_dyn_table) - index;
@@ -1575,7 +1575,6 @@ lshpack_dec_copy_value (lsxpack_header_t *output, char *dest, const char *val,
     return 0;
 }
 
-
 static int
 lshpack_dec_copy_name (lsxpack_header_t *output, char **dest, const char *name,
                        unsigned name_len)
@@ -1614,6 +1613,8 @@ lshpack_dec_decode (struct lshpack_dec *dec,
     const unsigned char *s;
     size_t buf_len = output->val_len;
     size_t extra_buf = 0;
+
+    int ret = 0;
 
     if ((*src) == src_end)
         return LSHPACK_ERR_BAD_DATA;
@@ -1736,8 +1737,13 @@ lshpack_dec_decode (struct lshpack_dec *dec,
         else
         {
             entry = hdec_get_table_entry(dec, index);
-            if (entry == NULL)
-                return LSHPACK_ERR_BAD_DATA;
+            if (entry == NULL || dec->hpd_ignore_dyntable)
+            {
+                ret = LSHPACK_ERR_DYN_MISSING;
+                dec->hpd_ignore_dyntable = 1;
+                lshpack_dec_copy_name(output, &name, "", 0);
+                goto decode_value;
+            }
             if (lshpack_dec_copy_name(output, &name, DTE_NAME(entry),
                     entry->dte_name_len) == LSHPACK_ERR_MORE_BUF)
             {
@@ -1753,8 +1759,13 @@ lshpack_dec_decode (struct lshpack_dec *dec,
             output->flags |= entry->dte_flags & DTEF_NAME_HASH;
             output->name_hash = entry->dte_name_hash;
 #endif
+decode_value:
             if (indexed_type == LSHPACK_VAL_INDEX)
             {
+                if (dec->hpd_ignore_dyntable) {
+                    lshpack_dec_copy_value(output, name, "", 0);
+                    goto decode_end;
+                }
                 if (lshpack_dec_copy_value(output, name, DTE_VALUE(entry),
                                            entry->dte_val_len) == 0)
                 {
@@ -1843,15 +1854,17 @@ lshpack_dec_decode (struct lshpack_dec *dec,
                         + LSHPACK_DEC_HTTP1X_EXTRA;
     output->val_len = len;
 
+    if (!dec->hpd_ignore_dyntable) {
     if (indexed_type == LSHPACK_ADD_INDEX &&
                                 0 != lshpack_dec_push_entry(dec, output))
         return LSHPACK_ERR_BAD_DATA;  //error
+    }
 decode_end:
     *src = s;
 #if LSHPACK_DEC_HTTP1X_OUTPUT
     output->dec_overhead = 4;
 #endif
-    return 0;
+    return ret;
 need_more_buf:
     buf_len += extra_buf;
     output->val_len = buf_len;
