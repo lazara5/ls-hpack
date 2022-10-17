@@ -215,6 +215,11 @@ lshpack_dec_decode (struct lshpack_dec *dec,
 void
 lshpack_dec_set_max_capacity (struct lshpack_dec *, unsigned);
 
+/*
+ * Pass 1 to disable dynamic table on decoding errors
+ */
+void lshpack_dec_disable_dyntable_on_error(struct lshpack_dec *, unsigned);
+
 /* Some internals follow.  Struct definitions are exposed to save a malloc.
  * These structures are not very complicated.
  */
@@ -291,6 +296,7 @@ struct lshpack_dec
     unsigned           hpd_cur_capacity;
     unsigned           hpd_state;
     unsigned           hpd_ignore_dyntable;
+    unsigned           hpd_disable_dyn_on_error; /* Disable dyntable on errors */
     lshpack_malloc     malloc;
     lshpack_free       free;
     void              *mem_user_data;

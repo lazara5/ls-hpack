@@ -1280,6 +1280,7 @@ lshpack_dec_init (struct lshpack_dec *dec)
     memset(dec, 0, sizeof(*dec));
     dec->hpd_max_capacity = INITIAL_DYNAMIC_TABLE_SIZE;
     dec->hpd_cur_max_capacity = INITIAL_DYNAMIC_TABLE_SIZE;
+    dec->hpd_disable_dyn_on_error = 1;
     lshpack_arr_init(&dec->hpd_dyn_table);
     dec->malloc = default_malloc;
     dec->free = default_free;
@@ -1402,6 +1403,11 @@ lshpack_dec_set_max_capacity (struct lshpack_dec *dec, unsigned max_capacity)
     hdec_update_max_capacity(dec, max_capacity);
 }
 
+void
+lshpack_dec_disable_dyntable_on_error(struct lshpack_dec *dec, unsigned disable)
+{
+    dec->hpd_disable_dyn_on_error = disable;
+}
 
 static unsigned char *
 hdec_huff_dec4bits (uint8_t src_4bits, unsigned char *dst,
@@ -1759,7 +1765,9 @@ lshpack_dec_decode (struct lshpack_dec *dec,
             if (entry == NULL || dec->hpd_ignore_dyntable)
             {
                 ret = LSHPACK_ERR_DYN_MISSING;
-                dec->hpd_ignore_dyntable = 1;
+                if (dec->hpd_disable_dyn_on_error) {
+                    dec->hpd_ignore_dyntable = 1;
+                }
                 lshpack_dec_copy_name(output, &name, "", 0);
                 goto decode_value;
             }
@@ -1781,7 +1789,7 @@ lshpack_dec_decode (struct lshpack_dec *dec,
 decode_value:
             if (indexed_type == LSHPACK_VAL_INDEX)
             {
-                if (dec->hpd_ignore_dyntable) {
+                if (dec->hpd_ignore_dyntable || entry == NULL) {
                     lshpack_dec_copy_value(output, name, "", 0);
                     goto decode_end;
                 }
