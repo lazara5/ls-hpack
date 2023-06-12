@@ -220,6 +220,9 @@ lshpack_dec_set_max_capacity (struct lshpack_dec *, unsigned);
  */
 void lshpack_dec_disable_dyntable_on_error(struct lshpack_dec *, unsigned);
 
+/* Disable dynamic table */
+void lshpack_dec_disable_dyntable(struct lshpack_dec *);
+
 /* Some internals follow.  Struct definitions are exposed to save a malloc.
  * These structures are not very complicated.
  */

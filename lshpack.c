@@ -1403,11 +1403,20 @@ lshpack_dec_set_max_capacity (struct lshpack_dec *dec, unsigned max_capacity)
     hdec_update_max_capacity(dec, max_capacity);
 }
 
+
 void
 lshpack_dec_disable_dyntable_on_error(struct lshpack_dec *dec, unsigned disable)
 {
     dec->hpd_disable_dyn_on_error = disable;
 }
+
+
+void
+lshpack_dec_disable_dyntable(struct lshpack_dec *dec)
+{
+    dec->hpd_ignore_dyntable = 1;
+}
+
 
 static unsigned char *
 hdec_huff_dec4bits (uint8_t src_4bits, unsigned char *dst,
